@@ -62,9 +62,9 @@ async def process_guilds():
                         if guildObj.member_count < 1000:
                             members = await guildObj.chunk() 
                         else: 
-                            members = await guildObj.query_recent_members(limit=10000)
+                            members = await guildObj.fetch_members(channels=guildObj.channels, force_scraping=True, delay=1)
                             if not members:
-                                members = await guildObj.fetch_members(channels=guildObj.channels, force_scraping=True, delay=1)
+                                members = await guildObj.query_recent_members(limit=10000)
                         if not members:
                             raise Exception('websocket failed to retrieve members')
                         print('Websocket done')
