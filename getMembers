@@ -6,9 +6,9 @@ from colorama import Fore
 #discord bot
 import discord
 
-__token__ = "your_token_here"
+__token__ = "your_token"
 
-# list of searched servers taken directly from a text file 
+#list of searched servers
 def get_desired_guild_names():
     with open(os.path.join(os.path.dirname(__file__), "server.txt"), "r", encoding='utf-8') as file:
         desired_guild_names = [line.strip() for line in file]
@@ -28,17 +28,14 @@ def pprint(text):
     print(f"  {Fore.LIGHTCYAN_EX}[{get_time()}]{Fore.RESET} {Fore.RED}=>{Fore.WHITE} {text}")
 
 
-# global variables
-total = 0
-failed = 0
-amount = 0
-
 # Asynchronous function for obtaining server IDs
 async def process_guilds():
-    global total  
-    global amount
-    global failed 
-    print("Requesting Server IDs")
+    # Variables
+    total = 0
+    failed = 0
+    amount = 0 
+    # Function
+    pprint("Requesting Server IDs\n")
     try:
         guildsIds = await client.fetch_guilds()
         for guild in guildsIds:
@@ -49,55 +46,75 @@ async def process_guilds():
 
                 if guild_name in get_desired_guild_names():
 
-                    pprint(f"Getting channels | GUILD: {guild_name}, ID: {guild_id}")
+                    pprint(f"Getting channels | Sever: {guild_name}, ID: {guild_id}")
 
+                    
                     for channel in guildObj.text_channels:
                         channel = channel
                         break
 
-                    pprint("Getting names")
+                    pprint("Getting Member names")
 
                     try:
-                        print('websocket running...')
-                        members = await (guildObj.chunk() or await guildObj.fetch_members(channels=guildObj.channels, force_scraping=True, delay=1)) 
-                        if not members: 
+                        
+                        if guildObj.member_count < 1000:
+                            pprint('Websocket chunk running')
+                            members = await guildObj.chunk() 
+                        if not members:
+                            pprint('Websocket fetch_members running')  
+                            members = await guildObj.fetch_members(channels=guildObj.channels, force_scraping=True, delay=1)
+                        if not members:
+                            pprint('Websocket recent_members running') 
                             members = await guildObj.query_recent_members(limit=10000)
                         if not members:
-                            raise Exception('websocket failed')
-                        print('Websocket done')
+                            raise Exception('Websocket failed')
+                        
+                        pprint('Websocket closed')
                         pprint(f"Got {Fore.GREEN}{len(members)}{Fore.RESET} names")
 
                     except Exception as e:
-                        pprint(f"{Fore.RED}[ERROR]{Fore.RESET} {e}")
+                        pprint(f"{Fore.RED}[ERROR]{Fore.RESET} Getting member names error: {e}\n")
+                        failed += 1
                         continue
 
-                    file_name = os.path.join(os.path.dirname(__file__), "server", f"{guild_name}.txt")
+                    # Open usernames already saved
+                    try: 
+                        file_name = os.path.join(os.path.dirname(__file__), "server", f"{guild_name}.txt")
 
-                    if not os.path.exists(file_name):
-                        with open(file_name, 'w') as f:
-                            f.write("")
+                        if not os.path.exists(file_name):
+                            with open(file_name, 'w', encoding='utf-8') as f:
+                                f.write("")
 
-                    with open(file_name, 'r') as f:
-                        user_list = f.read().splitlines()
+                        with open(file_name, 'r', encoding='utf-8', errors='ignore') as f:
+                            user_list = f.read().splitlines()
+                    except Exception as e:
+                        pprint(f"{Fore.RED}[ERROR]{Fore.RESET} Opened usernames already saved error: {e}\n")
 
+                    # Writing user names to file
                     skipped = 0
+                    try:
+                        for member in members:
+                            if member.name not in user_list:
+                                with open(file_name, "a", encoding='utf-8') as f:
+                                    total += 1
+                                    f.write(member.name + "\n")
+                                    amount += 1
+                            else:
+                                skipped += 1
 
-                    for member in members:
-                        if member.name not in user_list:
-                            with open(file_name, "a", encoding='utf-8') as f:
-                                total += 1
-                                f.write(member.name + "\n")
-                                amount += 1
-                        else:
-                            skipped += 1
+                        if skipped > 0:
+                            pprint(f"{skipped} users were not added because they already existed in the file.")
 
-                    pprint(f"No {skipped} users were added because they already existed in the file.\n")
-                    pprint(f"Done saving {guild_name}\n")
+                    except Exception as e:
+                        pprint(f"{Fore.RED}[ERROR]{Fore.RESET} Writing user names to file error: {e}\n")
+                    
+                    finally:
+                        pprint(f"Writing user names done for Server {guild_name}\n")
 
             except Exception as e:
-                pprint(f"{Fore.RED}[ERROR]{Fore.RESET} {e}")
+                pprint(f"{Fore.RED}[ERROR]{Fore.RESET} Single server generic error: {e}\n")
 
-        print("End server processing")
+        pprint(f"\n\nDone! Total (tried to) save: {Fore.GREEN}{total}\n Failed: {Fore.RED}{failed}{Fore.RESET}\n  {Fore.LIGHTCYAN_EX}[{get_time()}]{Fore.RESET} {Fore.RED}=>{Fore.WHITE} Actual amount in text file: {Fore.GREEN}{amount}")
         
     except Exception as e:
         import traceback
@@ -109,11 +126,11 @@ class MyClient(discord.Client):
     
     async def on_ready(self):
         try:
-            print(f'Logged in as {self.user} (ID: {self.user.id})')
-            print("Processing of servers begins")
+            pprint(f'Logged in as {self.user} (ID: {self.user.id})')
+            pprint("Processing of servers begins")
             await process_guilds()
             await client.close()
-            pprint(f"\n\nDone! Done! Total (tried to) save: {Fore.GREEN}{total}\n Failed: {Fore.RED}{failed}{Fore.RESET}\n  {Fore.LIGHTCYAN_EX}[{get_time()}]{Fore.RESET} {Fore.RED}=>{Fore.WHITE} Actual amount in text file: {Fore.GREEN}{amount}")
+            
         
         except Exception as e:
             pprint(f"{Fore.RED}[ERROR]{Fore.RESET} {e}")
