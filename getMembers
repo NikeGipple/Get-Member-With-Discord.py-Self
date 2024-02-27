@@ -6,7 +6,7 @@ from colorama import Fore
 #discord bot
 import discord
 
-__token__ = "your_token"
+__token__ = "tokenhere"
 
 #list of searched servers
 def get_desired_guild_names():
@@ -137,5 +137,5 @@ class MyClient(discord.Client):
 
         print('test')
   
-client = MyClient()
+client = MyClient(chunk_guilds_at_startup=False)
 client.run(__token__)
